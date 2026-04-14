@@ -198,7 +198,7 @@ function toCNF(original) {
 
     /* ── Step 0: Original grammar ── */
     capture(original, 'Original Grammar',
-        'This is your input Context-Free Grammar (CFG) as entered. We will now transform it step by step into Chomsky Normal Form (CNF).');
+        '<strong>Input Grammar:</strong> This is your Context-Free Grammar (CFG) as entered.<br><strong>Next Steps:</strong> The following 5 transformations will convert this to Chomsky Normal Form.');
 
     let g = cloneGrammar(original);
 
@@ -210,7 +210,7 @@ function toCNF(original) {
     for (const [k, v] of g.rules) newRules.set(k, v.map(p => [...p]));
     g = { start: newStart, rules: newRules };
     capture(g, 'Step 1 — New Start Symbol',
-        `A new start symbol <strong>${newStart}</strong> is introduced with a single production <strong>${newStart} → ${oldStart}</strong>. This ensures the original start symbol does not appear on the right-hand side of any rule, which is required by CNF.`,
+        `<strong>Why:</strong> CNF requires that the start symbol never appears on the RHS.<br><strong>Action:</strong> Add new start symbol <strong>${newStart}</strong> with production <strong>${newStart} → ${oldStart}</strong><br><strong>Effect:</strong> The original start <strong>${oldStart}</strong> can now safely appear on RHS.<br><strong>Language:</strong> Preserved (same strings accepted).`,
         [{ type: 'added', text: `${newStart} → ${oldStart}` }]
     );
 
@@ -228,7 +228,14 @@ function toCNF(original) {
 
     /* ── Final ── */
     capture(g, 'Final CNF Grammar',
-        'The grammar is now in Chomsky Normal Form (CNF). Every production is either <strong>A → BC</strong> (two non-terminals) or <strong>A → a</strong> (a single terminal). The start symbol may also produce ε if it was nullable in the original grammar.');
+        '<strong>✓ Success!</strong> Grammar is now in Chomsky Normal Form (CNF)<br>' +
+        '<strong>Properties:</strong><br>' +
+        '• Every production is A → BC (binary non-terminals) or A → a (single terminal)<br>' +
+        '• Start symbol does not appear on any RHS<br>' +
+        '• No ε-rules (except possibly S₀ → ε if original was nullable)<br>' +
+        '• No unit productions (A → B)<br>' +
+        '• No useless symbols<br>' +
+        '<strong>Applications:</strong> CYK parsing algorithm, formal language theory, automata equivalence proofs');
 
     return { steps, final: g };
 }
@@ -243,7 +250,7 @@ function eliminateEpsilon(g, steps) {
     if (nullable.size === 0 || (nullable.size === 1 && nullable.has(g.start))) {
         steps.push({
             name: 'Step 2 — Eliminate ε-Productions',
-            description: 'No ε-productions found (other than possibly the start symbol). Nothing to eliminate.',
+            description: '<strong>Observation:</strong> No ε-productions found (or only at start symbol).<br><strong>Action:</strong> Skip this step — already compliant with CNF requirement.',
             grammar: cloneGrammar(g),
             changes: [{ type: 'info', text: 'No ε-productions' }]
         });
@@ -295,7 +302,7 @@ function eliminateEpsilon(g, steps) {
 
     steps.push({
         name: 'Step 2 — Eliminate ε-Productions',
-        description: `Nullable non-terminals (those that can derive ε): <strong>${[...nullable].join(', ')}</strong>. For each production containing nullable symbols, we generate all combinations with those symbols included or omitted. ε-productions are then removed (except for the start symbol if the original grammar derived ε).`,
+        description: `<strong>Nullable Symbols:</strong> ${[...nullable].join(', ')}<br><strong>Process:</strong> For each production containing nullable symbols, generate all combinations (with/without each nullable).<br><strong>Example:</strong> If E → T U and T nullable → add E → U<br><strong>Then:</strong> Remove ε-rules. Language preserved.`,
         grammar: cloneGrammar(g2),
         changes
     });
@@ -354,7 +361,7 @@ function eliminateUnitProductions(g, steps) {
     if (!hasUnit) {
         steps.push({
             name: 'Step 3 — Eliminate Unit Productions',
-            description: 'No unit productions (A → B where B is a single non-terminal) found. Nothing to eliminate.',
+            description: '<strong>Check:</strong> No unit productions found (no rule like A → B).<br><strong>Result:</strong> Grammar already satisfies this CNF requirement.',
             grammar: cloneGrammar(g),
             changes: [{ type: 'info', text: 'No unit productions' }]
         });
@@ -407,7 +414,7 @@ function eliminateUnitProductions(g, steps) {
 
     steps.push({
         name: 'Step 3 — Eliminate Unit Productions',
-        description: 'A unit production has the form <strong>A → B</strong> where B is a single non-terminal. We replace each unit production by copying all non-unit productions of the reachable non-terminal, then remove the unit production itself.',
+        description: '<strong>Unit Production:</strong> Any rule with exactly one non-terminal on RHS (e.g., A → B)<br><strong>Problem:</strong> Creates unnecessary derivation steps<br><strong>Solution:</strong> For each unit A → B, copy all non-unit productions of B into A<br><strong>Then:</strong> Remove the original unit production A → B<br><strong>Result:</strong> Shortest derivation paths, still generating same language',
         grammar: cloneGrammar(g2),
         changes
     });
@@ -474,7 +481,7 @@ function eliminateUseless(g, steps) {
     if (removedStr.length === 0) {
         steps.push({
             name: 'Step 4 — Eliminate Useless Symbols',
-            description: 'All non-terminals are both <em>generating</em> (can derive a terminal string) and <em>reachable</em> (can be reached from the start symbol). No useless symbols found.',
+            description: '<strong>Check:</strong> All non-terminals are <strong>generating</strong> (derive a terminal string) and <strong>reachable</strong> (from start symbol)<br><strong>Result:</strong> No useless symbols. Grammar is clean.',
             grammar: cloneGrammar(g2),
             changes: [{ type: 'info', text: 'No useless symbols' }]
         });
@@ -483,7 +490,7 @@ function eliminateUseless(g, steps) {
 
     steps.push({
         name: 'Step 4 — Eliminate Useless Symbols',
-        description: `Useless symbols are non-terminals that are either non-generating (cannot derive any terminal string) or unreachable (cannot be reached from the start symbol). Removed: <strong>${removedStr.join(', ')}</strong>.`,
+        description: '<strong>Useless symbols removed:</strong> ' + removedStr.join(', ') + '<br><strong>Definition:</strong><br>• <strong>Non-generating:</strong> Cannot derive any terminal string<br>• <strong>Unreachable:</strong> Cannot be reached from start symbol<br><strong>Action:</strong> Delete these non-terminals and related productions<br><strong>Result:</strong> Reduced grammar, same language.',
         grammar: cloneGrammar(g2),
         changes: removedStr.map(t => ({ type: 'removed', text: t }))
     });
@@ -571,9 +578,11 @@ function binarizeAndTerminalize(g, steps) {
     const allAdded = added;
     steps.push({
         name: 'Step 5 — Binarize & Terminalize',
-        description: 'In CNF, productions must be either <strong>A → BC</strong> or <strong>A → a</strong>. ' +
-            'We (1) replace each terminal in long productions with a new non-terminal (e.g., <code>a</code> → <code>Ta</code>), ' +
-            'and (2) break productions with more than 2 symbols into chains of binary productions. We reuse intermediate variables for identical pairs to keep the grammar compact.',
+        description: '<strong>Final CNF requirement:</strong> Each production is either A → a (single terminal) or A → BC (two non-terminals)<br>' +
+            '<strong>Step 5.1 — Terminalize:</strong> If A → a B C, wrap terminal a in new NT: W_a → a; then A → W_a B C<br>' +
+            '<strong>Step 5.2 — Binarize:</strong> If A → B C D, chain binary rules: A → B X, X → C D<br>' +
+            '<strong>Compaction:</strong> Reuse intermediate NTs for identical pairs (e.g., both B C encoded as one X₁)<br>' +
+            '<strong>Result:</strong> Grammar now in strict  Chomsky Normal Form, ready for CYK parsing algorithm.',
         grammar: cloneGrammar(g2),
         changes: allAdded.map(t => ({ type: 'added', text: t }))
     });
@@ -607,7 +616,10 @@ function toGNF(cnfGrammar) {
     let g = cloneGrammar(cnfGrammar);
 
     capture(g, 'Starting Point (CNF Result)',
-        'We begin with the CNF grammar from the previous transformation. To convert to Greibach Normal Form (GNF), every production must have the form <strong>A → a α</strong> — a single terminal followed by zero or more non-terminals.');
+        '<strong>Input:</strong> CNF grammar (all productions are A → BC or A → a)<br>' +
+        '<strong>Goal:</strong> Convert to Greibach Normal Form (GNF): A → a α (terminal-first form)<br>' +
+        '<strong>Why GNF?</strong> Useful for pushdown automata construction, top-down parsing, and certain theoretical proofs<br>' +
+        '<strong>Process:</strong> We will order non-terminals and use substitution to force terminals to appear first in every production');
 
     /* ── Step 1: Order non-terminals ── */
     const nts = [...g.rules.keys()];
@@ -616,8 +628,12 @@ function toGNF(cnfGrammar) {
 
     steps.push({
         name: 'Step 1 — Order Non-Terminals',
-        description: `Non-terminals are ordered: <strong>${ordered.join(', ')}</strong>. We index them A₁, A₂, … Aₙ. ` +
-            'Then we apply substitution to ensure every production Aᵢ → Aⱼ γ has j > i (no "backward" references that would cause issues).',
+        description: `<strong>Indexing:</strong> Order non-terminals as A₁, A₂, … Aₙ<br>` +
+            `<strong>Current ordering:</strong> ${ordered.join(', ')}<br>` +
+            `<strong>Strategy:</strong> Process each Aᵢ and ensure:<br>` +
+            `• No productions Aᵢ → Aⱼ γ where j ≤ i (only forward references allowed)<br>` +
+            `• No left recursion Aᵢ → Aᵢ α<br>` +
+            `• This systematic ordering ensures we can resolve all dependencies`,
         grammar: cloneGrammar(g),
         changes: ordered.map((nt, i) => ({ type: 'info', text: `A${i + 1} = ${nt}` }))
     });
@@ -630,7 +646,15 @@ function toGNF(cnfGrammar) {
 
     /* ── Final ── */
     capture(g, 'Final GNF Grammar',
-        'The grammar is now in Greibach Normal Form (GNF). Every production begins with exactly one terminal symbol, followed by zero or more non-terminals: <strong>A → a A₁A₂…Aₙ</strong>.');
+        '<strong>✓ Success!</strong> Grammar is now in Greibach Normal Form (GNF)<br>' +
+        '<strong>Properties:</strong><br>' +
+        '• Every production has form A → a α where a is a terminal and α is zero or more non-terminals<br>' +
+        '• All productions are terminal-leading (no left recursion possible)<br>' +
+        '• No unit productions; no ε-rules<br>' +
+        '<strong>Applications:</strong><br>' +
+        '• Converting CFGs to equivalent Pushdown Automata (PDA)<br>' +
+        '• Top-down parsing without backtracking<br>' +
+        '• Theoretical proofs about grammar equivalence');
 
     return { steps, final: g };
 }
@@ -696,8 +720,10 @@ function forwardSubstitution(g, ordered, steps) {
 
     steps.push({
         name: 'Step 2 — Forward Substitution & Eliminate Left Recursion',
-        description: 'For each non-terminal Aᵢ, we substitute lower-indexed non-terminals Aⱼ (j < i) appearing at the left of productions. ' +
-            'If direct left recursion (Aᵢ → Aᵢ α) arises, we eliminate it by introducing a new non-terminal Aᵢ\' using the standard left-recursion elimination technique.',
+        description: '<strong>Forward Substitution:</strong> For each Aᵢ, substitute any lower-indexed Aⱼ (j < i) that appears on the left of productions<br>' +
+            '<strong>Example:</strong> If A₂ → A₁ b and A₁ → c, replace with A₂ → c b<br>' +
+            '<strong>Left Recursion Elimination:</strong> If Aᵢ → Aᵢ α γ (self-loop), convert to A → β A\', A\' → α A\' | ε<br>' +
+            '<strong>Result:</strong> All dependencies now point to higher-indexed variables; left recursion removed',
         grammar: cloneGrammar(g2),
         changes: changes.length ? changes : [{ type: 'info', text: 'No left recursion found' }]
     });
@@ -751,8 +777,11 @@ function backwardSubstitution(g, ordered, steps) {
 
     steps.push({
         name: 'Step 3 — Backward Substitution',
-        description: 'Working from the last non-terminal back to the first, we substitute each non-terminal-leading production. ' +
-            'Since higher-indexed NTs already have terminal-leading productions (from earlier steps), substituting them ensures all productions start with a terminal — achieving GNF.',
+        description: '<strong>Backward pass (i = n down to 1):</strong><br>' +
+            '<strong>Goal:</strong> Ensure every production of each variable starts with a terminal<br>' +
+            '<strong>Method:</strong> For each Aᵢ, if a production has form Aᵢ → Aⱼ γ (j > i), substitute Aⱼ\'s terminal-leading productions<br>' +
+            '<strong>Why it works:</strong> Since we already processed higher variables (j > i), they all have terminal-leading rules. Substituting forces a terminal to the front<br>' +
+            '<strong>Result:</strong> All productions now in GNF form: A → a α',
         grammar: cloneGrammar(g2),
         changes: changes.length ? changes : [{ type: 'info', text: 'No substitution needed' }]
     });
@@ -1072,6 +1101,14 @@ function renderTree(result) {
 
                 <!-- Speed + Play/Pause -->
                 <div class="flex items-center gap-2">
+                    <button id="btnDownloadTree" title="Download Tree (Text)"
+                        class="p-2 rounded-lg hover:bg-white/10 text-slate-400 transition-colors"
+                        onclick="downloadParseTree()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0L8 8m4 4V4"></path>
+                        </svg>
+                    </button>
                     <select id="treeAnimSpeed"
                         class="text-xs bg-white/5 border border-white/10 text-slate-300 rounded-lg px-2 py-1.5 outline-none cursor-pointer">
                         <option value="1500">Slow</option>
@@ -1283,10 +1320,7 @@ function switchToTab(tab) {
         }
     }
 
-    // Show/hide walkthrough for transformation tabs
-    const isTransTab = (tab === 'cnf' || tab === 'gnf');
-    document.getElementById('walkthroughBar').classList.toggle('hidden', !isTransTab);
-    if (isTransTab) updateWalkthroughUI(tab);
+    // Show/hide walkthrough handled at tab level
 }
 
 function setupButtons() {
@@ -1307,55 +1341,118 @@ function setupButtons() {
         if (e.key === 'Enter') runMembershipTest();
     });
 
-    // Walkthrough Buttons
-    document.getElementById('btnPrevStep').addEventListener('click', () => changeWalkthroughStep(-1));
-    document.getElementById('btnNextStep').addEventListener('click', () => changeWalkthroughStep(1));
-    document.getElementById('btnPlaySteps').addEventListener('click', autoPlaySteps);
+
 }
 
 let activeWalkthroughTab = 'cnf';
 let currentWalkStep = 0;
+let currentStepCNF = 0;
+let currentStepGNF = 0;
 let autoPlayInterval = null;
+let autoPlayStateCNF = false;
+let autoPlayStateGNF = false;
 
-function updateWalkthroughUI(tab) {
-    activeWalkthroughTab = tab;
+
+
+
+
+function navigateStep(tab, delta) {
     const container = document.getElementById(tab + 'Output');
     const steps = container.querySelectorAll('.step-card');
-    if (steps.length === 0) {
-        document.getElementById('walkthroughBar').classList.add('hidden');
-        return;
+    let currentStep = tab === 'cnf' ? currentStepCNF : currentStepGNF;
+    const nextStep = currentStep + delta;
+    
+    if (nextStep >= 0 && nextStep < steps.length) {
+        currentStep = nextStep;
+        if (tab === 'cnf') {
+            currentStepCNF = currentStep;
+        } else {
+            currentStepGNF = currentStep;
+        }
+        updateStepDisplay(tab, currentStep);
     }
+}
 
-    document.getElementById('totalStepsNum').textContent = steps.length;
-    document.getElementById('currentStepNum').textContent = currentWalkStep + 1;
+function autoPlayTransformation(tab) {
+    const tabKey = tab === 'cnf' ? 'CNF' : 'GNF';
+    const buttonId = `btnAutoPlay${tabKey}`;
+    const button = document.getElementById(buttonId);
+    const isPlaying = tab === 'cnf' ? autoPlayStateCNF : autoPlayStateGNF;
+    let currentStep = tab === 'cnf' ? currentStepCNF : currentStepGNF;
+    
+    if (isPlaying) {
+        // Stop auto play
+        if (autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+        }
+        if (tab === 'cnf') autoPlayStateCNF = false;
+        else autoPlayStateGNF = false;
+        
+        button.innerHTML = `
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+            </svg>
+            Auto Play
+        `;
+    } else {
+        // Start auto play
+        if (tab === 'cnf') autoPlayStateCNF = true;
+        else autoPlayStateGNF = true;
+        
+        button.innerHTML = `
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+            Pause
+        `;
+        
+        autoPlayInterval = setInterval(() => {
+            const container = document.getElementById(tab + 'Output');
+            const steps = container.querySelectorAll('.step-card');
+            
+            // Get current step for this tab
+            let stepIndex = tab === 'cnf' ? currentStepCNF : currentStepGNF;
+            
+            if (stepIndex < steps.length - 1) {
+                stepIndex++;
+                if (tab === 'cnf') currentStepCNF = stepIndex;
+                else currentStepGNF = stepIndex;
+                updateStepDisplay(tab, stepIndex);
+            } else {
+                // Restart
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+                if (tab === 'cnf') autoPlayStateCNF = false;
+                else autoPlayStateGNF = false;
+                
+                button.innerHTML = `
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                    </svg>
+                    Auto Play
+                `;
+            }
+        }, 2500);
+    }
+}
 
-    const progress = ((currentWalkStep + 1) / steps.length) * 100;
-    document.getElementById('walkthroughProgress').style.width = `${progress}%`;
-
-    document.getElementById('btnPrevStep').disabled = (currentWalkStep === 0);
-    document.getElementById('btnNextStep').disabled = (currentWalkStep === steps.length - 1);
-
+function updateStepDisplay(tab, stepIndex) {
+    const container = document.getElementById(tab + 'Output');
+    const steps = container.querySelectorAll('.step-card');
+    
     // Show ONLY current step
     steps.forEach((s, i) => {
-        const isOpen = i === currentWalkStep;
-
+        const isOpen = i === stepIndex;
         if (isOpen) {
             s.classList.remove('hidden');
-
-            // Ensure body is open and the step animates in
             const body = s.querySelector('.step-body');
             if (body) body.classList.add('open');
-
-            // We no longer need the chevron since it's a slideshow
             const chevron = s.querySelector('.chevron');
             if (chevron) chevron.classList.add('hidden');
-
-            // Remove pointer styling from header
             const header = s.querySelector('.step-header');
             if (header) {
                 header.style.cursor = 'default';
-                const klikable = header.querySelector('.flex-1');
-                if (klikable) klikable.style.cursor = 'default';
             }
         } else {
             s.classList.add('hidden');
@@ -1363,48 +1460,7 @@ function updateWalkthroughUI(tab) {
     });
 }
 
-function changeWalkthroughStep(delta) {
-    const container = document.getElementById(activeWalkthroughTab + 'Output');
-    const steps = container.querySelectorAll('.step-card');
-    const nextStep = currentWalkStep + delta;
-    if (nextStep >= 0 && nextStep < steps.length) {
-        currentWalkStep = nextStep;
-        updateWalkthroughUI(activeWalkthroughTab);
-    }
-}
 
-function autoPlaySteps() {
-    if (autoPlayInterval) {
-        clearInterval(autoPlayInterval);
-        autoPlayInterval = null;
-        document.getElementById('btnPlaySteps').innerHTML = `
-            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
-            Auto Play
-        `;
-        return;
-    }
-
-    document.getElementById('btnPlaySteps').innerHTML = `
-        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
-        Pause
-    `;
-
-    autoPlayInterval = setInterval(() => {
-        const container = document.getElementById(activeWalkthroughTab + 'Output');
-        const steps = container.querySelectorAll('.step-card');
-        if (currentWalkStep < steps.length - 1) {
-            changeWalkthroughStep(1);
-        } else {
-            // Restart or stop
-            clearInterval(autoPlayInterval);
-            autoPlayInterval = null;
-            document.getElementById('btnPlaySteps').innerHTML = `
-                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
-                Auto Play
-            `;
-        }
-    }, 2500);
-}
 
 function runTransform() {
     const input = document.getElementById('grammarInput').value.trim();
@@ -1448,9 +1504,26 @@ function runTransform() {
     // Render CNF
     const cnfOut = document.getElementById('cnfOutput');
     cnfOut.innerHTML = `
-        <div class="final-banner mb-4 gap-2 flex items-center">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            CNF Transformation — ${cnfResult.steps.length} steps
+        <div class="final-banner mb-4 gap-2 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                CNF Transformation — ${cnfResult.steps.length} steps
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="btnPrevCNF" class="btn-secondary py-1.5 px-2 text-xs flex items-center" title="Previous Step">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <button id="btnNextCNF" class="btn-secondary py-1.5 px-2 text-xs flex items-center" title="Next Step">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <button id="btnAutoPlayCNF" class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    Auto Play
+                </button>
+                <button id="btnDownloadCNF" class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5" title="Download Grammar">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0L8 8m4 4V4"></path></svg>
+                </button>
+            </div>
         </div>
         <div class="space-y-3">${renderSteps(cnfResult.steps, 'cnf')}</div>
     `;
@@ -1459,9 +1532,26 @@ function runTransform() {
     const gnfOut = document.getElementById('gnfOutput');
     if (gnfResult) {
         gnfOut.innerHTML = `
-            <div class="final-banner gnf mb-4 gap-2 flex items-center">
-                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                GNF Transformation — ${gnfResult.steps.length} steps
+            <div class="final-banner gnf mb-4 gap-2 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    GNF Transformation — ${gnfResult.steps.length} steps
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btnPrevGNF" class="btn-secondary py-1.5 px-2 text-xs flex items-center" title="Previous Step">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button id="btnNextGNF" class="btn-secondary py-1.5 px-2 text-xs flex items-center" title="Next Step">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                    <button id="btnAutoPlayGNF" class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                        Auto Play
+                    </button>
+                    <button id="btnDownloadGNF" class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5" title="Download Grammar">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0L8 8m4 4V4"></path></svg>
+                    </button>
+                </div>
             </div>
             <div class="info-box">ℹ GNF transformation starts from the CNF result.</div>
             <div class="space-y-3">${renderSteps(gnfResult.steps, 'gnf')}</div>
@@ -1473,7 +1563,55 @@ function runTransform() {
     // Show outputs
     document.getElementById('emptyState').classList.add('hidden');
     currentWalkStep = 0;
+    currentStepCNF = 0;
+    currentStepGNF = 0;
+    autoPlayStateCNF = false;
+    autoPlayStateGNF = false;
+    if (autoPlayInterval) {
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = null;
+    }
     switchToTab('cnf');
+
+    // Attach auto play listeners
+    const btnAutoPlayCNF = document.getElementById('btnAutoPlayCNF');
+    const btnAutoPlayGNF = document.getElementById('btnAutoPlayGNF');
+    
+    if (btnAutoPlayCNF) {
+        btnAutoPlayCNF.addEventListener('click', () => autoPlayTransformation('cnf'));
+    }
+    if (btnAutoPlayGNF) {
+        btnAutoPlayGNF.addEventListener('click', () => autoPlayTransformation('gnf'));
+    }
+
+    // Attach Download Listeners
+    const btnDownloadCNF = document.getElementById('btnDownloadCNF');
+    const btnDownloadGNF = document.getElementById('btnDownloadGNF');
+    if (btnDownloadCNF) btnDownloadCNF.addEventListener('click', () => downloadGrammarData('CNF', cnfResult.final));
+    if (btnDownloadGNF) btnDownloadGNF.addEventListener('click', () => downloadGrammarData('GNF', gnfResult.final));
+
+    // Attach navigation listeners
+    const btnPrevCNF = document.getElementById('btnPrevCNF');
+    const btnNextCNF = document.getElementById('btnNextCNF');
+    const btnPrevGNF = document.getElementById('btnPrevGNF');
+    const btnNextGNF = document.getElementById('btnNextGNF');
+    
+    if (btnPrevCNF) {
+        btnPrevCNF.addEventListener('click', () => navigateStep('cnf', -1));
+    }
+    if (btnNextCNF) {
+        btnNextCNF.addEventListener('click', () => navigateStep('cnf', 1));
+    }
+    if (btnPrevGNF) {
+        btnPrevGNF.addEventListener('click', () => navigateStep('gnf', -1));
+    }
+    if (btnNextGNF) {
+        btnNextGNF.addEventListener('click', () => navigateStep('gnf', 1));
+    }
+
+    // Initialize display to show ONLY the first step
+    updateStepDisplay('cnf', 0);
+    if (gnfResult) updateStepDisplay('gnf', 0);
 
     // Save result for membership test
     currentCNFResult = cnfResult.final;
@@ -1965,4 +2103,86 @@ function _treeSetPlayUI(playing) {
         icon.innerHTML = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>`;
         label.textContent = 'Play';
     }
+}
+// ─────────────────────────────────────────────────────────────
+//  DOWNLOAD HELPERS
+// ─────────────────────────────────────────────────────────────
+
+function downloadTextFile(filename, text) {
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+    element.setAttribute('download', filename);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+}
+
+function downloadGrammarData(type, grammar) {
+    if (!grammar) return;
+    const lines = grammarToString(grammar);
+    let text = `// ${type} Grammar\n// Generated by CFG Normalizer\n\n`;
+    
+    const grouped = {};
+    for (const { lhs, rhs } of lines) {
+        if (!grouped[lhs]) grouped[lhs] = [];
+        grouped[lhs].push(rhs.join(' '));
+    }
+    
+    const start = grammar.start;
+    const keys = [start, ...Object.keys(grouped).filter(k => k !== start)];
+    
+    keys.forEach(lhs => {
+        text += `${lhs} -> ${grouped[lhs].join(' | ')}\n`;
+    });
+    
+    downloadTextFile(`grammar_${type.toLowerCase()}.txt`, text);
+}
+
+function downloadGraphImage() {
+    if (!window.cyInstance) return;
+    const png64 = window.cyInstance.png({ full: true, bg: '#0f172a', scale: 2 });
+    const link = document.createElement('a');
+    link.href = png64;
+    link.download = 'grammar_graph.png';
+    link.click();
+}
+
+/** Downloads the parse tree as a formatted hierarchical text file */
+function downloadParseTree() {
+    const canvas = document.getElementById('treeCanvas');
+    if (!canvas) return;
+
+    // We can't easily capture the HTML as image without a library,
+    // so we'll generate a pretty-printed text tree.
+    
+    const resultBadge = document.querySelector('.cyk-result-badge');
+    const testString = resultBadge ? resultBadge.textContent.match(/"([^"]+)"/)?.[1] || "string" : "string";
+
+    function getTreeString(node, prefix = "", isLast = true) {
+        if (!node) return "";
+        const label = node.querySelector('.tree-label').textContent.trim();
+        let result = prefix + (isLast ? "└── " : "├── ") + label + "\n";
+        
+        const childrenContainer = node.querySelector('.tree-children');
+        if (childrenContainer) {
+            const children = Array.from(childrenContainer.children);
+            for (let i = 0; i < children.length; i++) {
+                result += getTreeString(children[i], prefix + (isLast ? "    " : "│   "), i === children.length - 1);
+            }
+        }
+        return result;
+    }
+
+    const root = canvas.querySelector('.tree-node');
+    if (!root) {
+        alert("No tree to download.");
+        return;
+    }
+
+    let text = `Parse Tree for string: "${testString}"\n`;
+    text += `====================================\n\n`;
+    text += getTreeString(root);
+    
+    downloadTextFile(`parse_tree_${testString}.txt`, text);
 }
